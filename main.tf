@@ -21,8 +21,8 @@ resource "azurerm_resource_group" "Terraform-RG" {
   location = "West Europe"
 }
 
-resource "azurerm_storage_account" "terrformstorage" {
-  name                     = "terraformltistorage"
+resource "azurerm_storage_account" "terrformsltistorage" {
+  name                     = "terrformsltistorage"
   resource_group_name      = azurerm_resource_group.Terraform-RG.name
   location                 = azurerm_resource_group.Terraform-RG.location
   account_tier             = "Standard"
@@ -31,4 +31,18 @@ resource "azurerm_storage_account" "terrformstorage" {
   tags = {
     environment = "staging"
   }
+}
+
+resource "azurerm_storage_container" "testcontianer" {
+  name                  = "testcontianer"
+  storage_account_name  = azurerm_storage_account.terrformsltistorage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_blob" "testblob" {
+  name                   = "some-local-file.txt"
+  storage_account_name   = azurerm_storage_account.terrformsltistorage.name
+  storage_container_name = azurerm_storage_container.testcontianer.name
+  type                   = "Block"
+  source                 = "some-local-file.txt"
 }
