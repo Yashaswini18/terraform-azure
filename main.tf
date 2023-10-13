@@ -45,4 +45,7 @@ resource "azurerm_storage_blob" "testblob" {
   storage_container_name = azurerm_storage_container.testcontianer.name
   type                   = "Block"
   source                 = "some-local-file.txt"
+  depends_on = [ 
+    azurerm_storage_account.terrformsltistorage
+   ]
 }
