@@ -16,11 +16,6 @@ provider "azurerm" {
   features { }
 }
 
-variable "storage_account_name" {
-  type = string
-  description = "Please enter a storage account name"
-}
-
 locals {
   resource_group = "Terraform-RG"
   location = "West Europe"
@@ -31,34 +26,18 @@ resource "azurerm_resource_group" "Terraform-RG" {
   location = local.location
 }
 
-resource "azurerm_storage_account" "terrformsltistorage" {
-  name                     = var.storage_account_name
-  resource_group_name      = local.resource_group
-  location                 = local.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+resource "azurerm_virtual_network" "terraform-vnet" {
+  name                = "terraform-vnet"
+  location            = local.location
+  resource_group_name = azurerm_resource_group.Terraform-RG.name
+  address_space       = ["10.0.0.0/16"]
+
+  subnet {
+    name           = "subnet1"
+    address_prefix = "10.0.1.0/24"
+  }
 
   tags = {
-    environment = "staging"
+    environment = "Production"
   }
-}
-
-resource "azurerm_storage_container" "testcontianer" {
-  name                  = "testcontianer"
-  storage_account_name  = var.storage_account_name
-  container_access_type = "private"
-    depends_on = [ 
-    azurerm_storage_account.terrformsltistorage
-   ]
-}
-
-resource "azurerm_storage_blob" "testblob" {
-  name                   = "some-local-file.txt"
-  storage_account_name   = var.storage_account_name
-  storage_container_name = azurerm_storage_container.testcontianer.name
-  type                   = "Block"
-  source                 = "some-local-file.txt"
-  depends_on = [ 
-    azurerm_storage_account.terrformsltistorage
-   ]
 }
