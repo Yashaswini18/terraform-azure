@@ -21,6 +21,12 @@ locals {
   location = "West Europe"
 }
 
+data "azurerm_subnet" "subnet1" {  //use data blocks when the resource doesn't have a specific azurerm mention, example "subnet1" here doesn't have a variable attached to it to call it from
+  name = "subnet1"
+  virtual_network_name = "terraform-vnet"
+  resource_group_name = azurerm_resource_group.Terraform-RG.name
+}
+
 resource "azurerm_resource_group" "Terraform-RG" {
   name     = local.resource_group
   location = local.location
@@ -40,4 +46,43 @@ resource "azurerm_virtual_network" "terraform-vnet" {
   tags = {
     environment = "Production"
   }
+}
+
+resource "azurerm_network_interface" "nic-name" {
+  name                = "terraform-nic"
+  location            = local.location
+  resource_group_name = azurerm_resource_group.Terraform-RG.name
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = data.azurerm_subnet.subnet1.id
+    private_ip_address_allocation = "Dynamic"
+  }
+
+  depends_on = [ azurerm_virtual_network.terraform-vnet ]
+}
+
+resource "azurerm_windows_virtual_machine" "vm-name" {
+  name                = "terrafomr-vm"
+  resource_group_name = azurerm_resource_group.Terraform-RG.name
+  location            = local.location
+  size                = "Standard_F2"
+  admin_username      = "adminuser"
+  admin_password      = "P@$$w0rd1234!"
+  network_interface_ids = [
+    azurerm_network_interface.nic-name.id
+  ]
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "MicrosoftWindowsServer"
+    offer     = "WindowsServer"
+    sku       = "2016-Datacenter"
+    version   = "latest"
+  }
+  
+  depends_on = [ azurerm_network_interface.nic-name ]
 }
