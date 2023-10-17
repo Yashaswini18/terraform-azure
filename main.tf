@@ -16,15 +16,25 @@ provider "azurerm" {
   features { }
 }
 
-resource "azurerm_resource_group" "Terraform-RG" {
-  name     = "Terraform-RG"
+variable "storage_account_name" {
+  type = string
+  description = "Please enter a storage account name"
+}
+
+locals {
+  resource_group = "Terraform-RG"
   location = "West Europe"
 }
 
+resource "azurerm_resource_group" "Terraform-RG" {
+  name     = local.resource_group
+  location = local.location
+}
+
 resource "azurerm_storage_account" "terrformsltistorage" {
-  name                     = "terrformsltistorage"
-  resource_group_name      = azurerm_resource_group.Terraform-RG.name
-  location                 = azurerm_resource_group.Terraform-RG.location
+  name                     = var.storage_account_name
+  resource_group_name      = local.resource_group
+  location                 = local.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
@@ -35,13 +45,16 @@ resource "azurerm_storage_account" "terrformsltistorage" {
 
 resource "azurerm_storage_container" "testcontianer" {
   name                  = "testcontianer"
-  storage_account_name  = azurerm_storage_account.terrformsltistorage.name
+  storage_account_name  = var.storage_account_name
   container_access_type = "private"
+    depends_on = [ 
+    azurerm_storage_account.terrformsltistorage
+   ]
 }
 
 resource "azurerm_storage_blob" "testblob" {
   name                   = "some-local-file.txt"
-  storage_account_name   = azurerm_storage_account.terrformsltistorage.name
+  storage_account_name   = var.storage_account_name
   storage_container_name = azurerm_storage_container.testcontianer.name
   type                   = "Block"
   source                 = "some-local-file.txt"
