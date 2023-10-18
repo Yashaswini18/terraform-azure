@@ -56,9 +56,12 @@ resource "azurerm_network_interface" "nic-name" {
     name                          = "internal"
     subnet_id                     = data.azurerm_subnet.subnet1.id
     private_ip_address_allocation = "Dynamic"
+    public_ip_address_id = azurerm_public_ip.pub-name.id
   }
 
-  depends_on = [ azurerm_virtual_network.terraform-vnet ]
+  depends_on = [ 
+    azurerm_virtual_network.terraform-vnet, azurerm_public_ip.pub-name
+     ]
 }
 
 resource "azurerm_windows_virtual_machine" "vm-name" {
@@ -86,3 +89,11 @@ resource "azurerm_windows_virtual_machine" "vm-name" {
   
   depends_on = [ azurerm_network_interface.nic-name ]
 }
+
+resource "azurerm_public_ip" "pub-name" {
+  name                = "terraform-pub"
+  resource_group_name = azurerm_resource_group.Terraform-RG.name
+  location            = local.location
+  allocation_method   = "Static"
+}
+
