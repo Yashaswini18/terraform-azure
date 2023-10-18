@@ -65,7 +65,7 @@ resource "azurerm_network_interface" "nic-name" {
 }
 
 resource "azurerm_windows_virtual_machine" "vm-name" {
-  name                = "terrafomr-vm"
+  name                = "terraform-vm"
   resource_group_name = azurerm_resource_group.Terraform-RG.name
   location            = local.location
   size                = "Standard_F2"
@@ -97,3 +97,21 @@ resource "azurerm_public_ip" "pub-name" {
   allocation_method   = "Static"
 }
 
+resource "azurerm_managed_disk" "disk_name" {
+  name                 = "terraform_disk"
+  location             = local.location
+  resource_group_name  = local.resource_group
+  storage_account_type = "Standard_LRS"
+  create_option        = "Empty"
+  disk_size_gb         = "1"
+}
+
+resource "azurerm_virtual_machine_data_disk_attachment" "data-disk-attachment-name" {
+  managed_disk_id    = azurerm_managed_disk.disk_name.id
+  virtual_machine_id = azurerm_windows_virtual_machine.vm-name.id
+  lun                = "0"
+  caching            = "ReadWrite"
+  depends_on = [ 
+    azurerm_managed_disk.disk_name, azurerm_windows_virtual_machine.vm-name
+   ]
+}
