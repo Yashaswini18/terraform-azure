@@ -21,11 +21,11 @@ locals {
   location = "West Europe"
 }
 
-data "azurerm_subnet" "subnet1" {  //use data blocks when the resource doesn't have a specific azurerm mention, example "subnet1" here doesn't have a variable attached to it to call it from
-  name = "subnet1"
-  virtual_network_name = "terraform-vnet"
-  resource_group_name = azurerm_resource_group.Terraform-RG.name
-}
+# data "azurerm_subnet" "subnet1" {  //use data blocks when the resource doesn't have a specific azurerm mention, example "subnet1" here doesn't have a variable attached to it to call it from
+#   name = "subnet1"
+#   virtual_network_name = "terraform-vnet"
+#   resource_group_name = azurerm_resource_group.Terraform-RG.name
+# }
 
 resource "azurerm_resource_group" "Terraform-RG" {
   name     = local.resource_group
@@ -38,14 +38,20 @@ resource "azurerm_virtual_network" "terraform-vnet" {
   resource_group_name = azurerm_resource_group.Terraform-RG.name
   address_space       = ["10.0.0.0/16"]
 
-  subnet {
-    name           = "subnet1"
-    address_prefix = "10.0.1.0/24"
-  }
+  # subnet {
+  #   name           = "subnet1"
+  #   address_prefix = "10.0.1.0/24"
+  # }
+}
 
-  tags = {
-    environment = "Production"
-  }
+resource "azurerm_subnet" "subnet-name" {
+  name                 = "subnet1"
+  resource_group_name  = local.resource_group
+  virtual_network_name = azurerm_virtual_network.terraform-vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+  depends_on = [ 
+    azurerm_virtual_network.terraform-vnet
+   ]
 }
 
 resource "azurerm_network_interface" "nic-name" {
@@ -54,14 +60,16 @@ resource "azurerm_network_interface" "nic-name" {
   resource_group_name = azurerm_resource_group.Terraform-RG.name
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = data.azurerm_subnet.subnet1.id
+    subnet_id                     = azurerm_subnet.subnet-name.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id = azurerm_public_ip.pub-name.id
   }
 
   depends_on = [ 
-    azurerm_virtual_network.terraform-vnet, azurerm_public_ip.pub-name
-     ]
+    azurerm_virtual_network.terraform-vnet, 
+    azurerm_public_ip.pub-name,
+    azurerm_subnet.subnet-name
+  ]
 }
 
 resource "azurerm_windows_virtual_machine" "vm-name" {
@@ -71,6 +79,8 @@ resource "azurerm_windows_virtual_machine" "vm-name" {
   size                = "Standard_F2"
   admin_username      = "adminuser"
   admin_password      = "P@$$w0rd1234!"
+  availability_set_id = azurerm_availability_set.availability-set-name.id
+
   network_interface_ids = [
     azurerm_network_interface.nic-name.id
   ]
@@ -87,7 +97,10 @@ resource "azurerm_windows_virtual_machine" "vm-name" {
     version   = "latest"
   }
   
-  depends_on = [ azurerm_network_interface.nic-name ]
+  depends_on = [ 
+    azurerm_network_interface.nic-name, 
+    azurerm_availability_set.availability-set-name
+  ]
 }
 
 resource "azurerm_public_ip" "pub-name" {
@@ -100,7 +113,7 @@ resource "azurerm_public_ip" "pub-name" {
 resource "azurerm_managed_disk" "disk_name" {
   name                 = "terraform_disk"
   location             = local.location
-  resource_group_name  = local.resource_group
+  resource_group_name  = azurerm_resource_group.Terraform-RG.name
   storage_account_type = "Standard_LRS"
   create_option        = "Empty"
   disk_size_gb         = "1"
@@ -115,3 +128,55 @@ resource "azurerm_virtual_machine_data_disk_attachment" "data-disk-attachment-na
     azurerm_managed_disk.disk_name, azurerm_windows_virtual_machine.vm-name
    ]
 }
+
+resource "azurerm_availability_set" "availability-set-name" {
+  name                = "terraform-aset"
+  location            = local.location
+  resource_group_name = azurerm_resource_group.Terraform-RG.name
+  platform_fault_domain_count = 3
+  platform_update_domain_count = 3
+}
+
+resource "azurerm_storage_account" "storage_name" {
+  name                     = "terraformstorage90004568"
+  resource_group_name      = azurerm_resource_group.Terraform-RG.name
+  location                 = azurerm_resource_group.Terraform-RG.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  
+}
+
+resource "azurerm_storage_container" "container-name" {
+  name                  = "terraformcontainer"
+  storage_account_name  = azurerm_storage_account.storage_name.name
+  container_access_type = "blob"
+}
+
+resource "azurerm_storage_blob" "blob-name" {
+  name                   = "IIS_Config.ps1"
+  storage_account_name   = azurerm_storage_account.storage_name.name
+  storage_container_name = azurerm_storage_container.container-name.name
+  type                   = "Block"
+  source                 = "IIS_Config.ps1"
+}
+
+resource "azurerm_virtual_machine_extension" "extension-name" {
+  name                 = "hostname1"
+  virtual_machine_id   = azurerm_windows_virtual_machine.vm-name.id
+  publisher            = "Microsoft.Compute"
+  type                 = "CustomScriptExtension"
+  type_handler_version = "1.10"
+
+  depends_on = [ 
+    azurerm_storage_blob.blob-name
+   ]
+
+settings = <<SETTINGS
+    {
+        "fileUris": ["https://${azurerm_storage_account.storage_name.name}.blob.core.windows.net/terraformcontainer/IIS_Config.ps1"],
+          "commandToExecute": "powershell -ExecutionPolicy Unrestricted -file IIS_Config.ps1"     
+    }
+SETTINGS
+
+}
+
