@@ -27,6 +27,8 @@ locals {
 #   resource_group_name = azurerm_resource_group.Terraform-RG.name
 # }
 
+data "azurerm_client_config" "current" {}
+
 resource "azurerm_resource_group" "Terraform-RG" {
   name     = local.resource_group
   location = local.location
@@ -78,8 +80,8 @@ resource "azurerm_windows_virtual_machine" "vm-name" {
   location            = local.location
   size                = "Standard_F2"
   admin_username      = "adminuser"
-  admin_password      = "P@$$w0rd1234!"
-  availability_set_id = azurerm_availability_set.availability-set-name.id
+  admin_password      = azurerm_key_vault_secret.key-secrect-name.value
+  #availability_set_id = azurerm_availability_set.availability-set-name.id
 
   network_interface_ids = [
     azurerm_network_interface.nic-name.id
@@ -99,7 +101,8 @@ resource "azurerm_windows_virtual_machine" "vm-name" {
   
   depends_on = [ 
     azurerm_network_interface.nic-name, 
-    azurerm_availability_set.availability-set-name
+    #azurerm_availability_set.availability-set-name,
+    azurerm_key_vault_secret.key-secrect-name
   ]
 }
 
@@ -119,68 +122,67 @@ resource "azurerm_managed_disk" "disk_name" {
   disk_size_gb         = "1"
 }
 
-resource "azurerm_virtual_machine_data_disk_attachment" "data-disk-attachment-name" {
-  managed_disk_id    = azurerm_managed_disk.disk_name.id
-  virtual_machine_id = azurerm_windows_virtual_machine.vm-name.id
-  lun                = "0"
-  caching            = "ReadWrite"
-  depends_on = [ 
-    azurerm_managed_disk.disk_name, azurerm_windows_virtual_machine.vm-name
-   ]
-}
+# resource "azurerm_virtual_machine_data_disk_attachment" "data-disk-attachment-name" {
+#   managed_disk_id    = azurerm_managed_disk.disk_name.id
+#   virtual_machine_id = azurerm_windows_virtual_machine.vm-name.id
+#   lun                = "0"
+#   caching            = "ReadWrite"
+#   depends_on = [ 
+#     azurerm_managed_disk.disk_name, azurerm_windows_virtual_machine.vm-name
+#    ]
+# }
 
-resource "azurerm_availability_set" "availability-set-name" {
-  name                = "terraform-aset"
-  location            = local.location
-  resource_group_name = azurerm_resource_group.Terraform-RG.name
-  platform_fault_domain_count = 3
-  platform_update_domain_count = 3
-}
+# resource "azurerm_availability_set" "availability-set-name" {
+#   name                = "terraform-aset"
+#   location            = local.location
+#   resource_group_name = azurerm_resource_group.Terraform-RG.name
+#   platform_fault_domain_count = 3
+#   platform_update_domain_count = 3
+# }
 
-resource "azurerm_storage_account" "storage_name" {
-  name                     = "terraformstorage90004568"
-  resource_group_name      = azurerm_resource_group.Terraform-RG.name
-  location                 = azurerm_resource_group.Terraform-RG.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+# resource "azurerm_storage_account" "storage_name" {
+#   name                     = "terraformstorage90004568"
+#   resource_group_name      = azurerm_resource_group.Terraform-RG.name
+#   location                 = azurerm_resource_group.Terraform-RG.location
+#   account_tier             = "Standard"
+#   account_replication_type = "LRS"
   
-}
+# }
 
-resource "azurerm_storage_container" "container-name" {
-  name                  = "terraformcontainer"
-  storage_account_name  = azurerm_storage_account.storage_name.name
-  container_access_type = "blob"
-}
+# resource "azurerm_storage_container" "container-name" {
+#   name                  = "terraformcontainer"
+#   storage_account_name  = azurerm_storage_account.storage_name.name
+#   container_access_type = "blob"
+# }
 
-resource "azurerm_storage_blob" "blob-name" {
-  name                   = "IIS_Config.ps1"
-  storage_account_name   = azurerm_storage_account.storage_name.name
-  storage_container_name = azurerm_storage_container.container-name.name
-  type                   = "Block"
-  source                 = "IIS_Config.ps1"
-}
+# resource "azurerm_storage_blob" "blob-name" {
+#   name                   = "IIS_Config.ps1"
+#   storage_account_name   = azurerm_storage_account.storage_name.name
+#   storage_container_name = azurerm_storage_container.container-name.name
+#   type                   = "Block"
+#   source                 = "IIS_Config.ps1"
+# }
 
-resource "azurerm_virtual_machine_extension" "extension-name" {
-  name                 = "hostname1"
-  virtual_machine_id   = azurerm_windows_virtual_machine.vm-name.id
-  publisher            = "Microsoft.Compute"
-  type                 = "CustomScriptExtension"
-  type_handler_version = "1.10"
+# resource "azurerm_virtual_machine_extension" "extension-name" {
+#   name                 = "hostname1"
+#   virtual_machine_id   = azurerm_windows_virtual_machine.vm-name.id
+#   publisher            = "Microsoft.Compute"
+#   type                 = "CustomScriptExtension"
+#   type_handler_version = "1.10"
 
-  depends_on = [ 
-    azurerm_storage_blob.blob-name
-   ]
+#   depends_on = [ 
+#     azurerm_storage_blob.blob-name
+#    ]
 
-settings = <<SETTINGS
-    {
-        "fileUris": ["https://${azurerm_storage_account.storage_name.name}.blob.core.windows.net/terraformcontainer/IIS_Config.ps1"],
-          "commandToExecute": "powershell -ExecutionPolicy Unrestricted -file IIS_Config.ps1"     
-    }
-SETTINGS
+# settings = <<SETTINGS
+#     {
+#         "fileUris": ["https://${azurerm_storage_account.storage_name.name}.blob.core.windows.net/terraformcontainer/IIS_Config.ps1"],
+#           "commandToExecute": "powershell -ExecutionPolicy Unrestricted -file IIS_Config.ps1"     
+#     }
+# SETTINGS
 
-}
 
-//NSG
+#NSG
 resource "azurerm_network_security_group" "nsg-name" {
   name                = "terrafom-NSG"
   location            = local.location
@@ -202,4 +204,49 @@ resource "azurerm_network_security_group" "nsg-name" {
 resource "azurerm_subnet_network_security_group_association" "nsg-association" {
   subnet_id                 = azurerm_subnet.subnet-name.id
   network_security_group_id = azurerm_network_security_group.nsg-name.id
+
+  depends_on = [ 
+    azurerm_network_security_group.nsg-name
+   ]
+}
+
+#Key Vault
+resource "azurerm_key_vault" "keyvault-name" {
+  name                        = "terraformkeyvault0000654"
+  location                    = local.location
+  resource_group_name         = azurerm_resource_group.Terraform-RG.name
+  enabled_for_disk_encryption = true
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+  soft_delete_retention_days  = 7
+  purge_protection_enabled    = false
+
+  sku_name = "standard"
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+        key_permissions = [
+      "Get",
+    ]
+    secret_permissions = [
+      "Get", "Backup", "Delete", "List", "Purge", "Recover", "Restore", "Set",
+    ]
+    storage_permissions = [
+      "Get",
+    ]
+  }
+
+  depends_on = [ 
+    azurerm_resource_group.Terraform-RG
+   ]
+}
+
+resource "azurerm_key_vault_secret" "key-secrect-name" {
+  name         = "adminuser"
+  value        = "P@$$w0rd1234!"
+  key_vault_id = azurerm_key_vault.keyvault-name.id
+  depends_on = [ 
+    azurerm_key_vault.keyvault-name
+   ]
 }
