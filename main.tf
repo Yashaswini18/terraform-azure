@@ -21,6 +21,15 @@ locals {
   location = "West Europe"
 }
 
+data "template_cloudinit_config" "linuxconfig" {
+  gzip = true
+  base64_encode = true
+  part {
+    content_type = "text/cloud-config"
+    content = "packages: ['nginx']"
+  }
+}
+
 # data "azurerm_subnet" "subnet1" {  //use data blocks when the resource doesn't have a specific azurerm mention, example "subnet1" here doesn't have a variable attached to it to call it from
 #   name = "subnet1"
 #   virtual_network_name = "terraform-vnet"
@@ -83,6 +92,7 @@ resource "azurerm_linux_virtual_machine" "linux-vm-name" {
   # admin_password      = azurerm_key_vault_secret.key-secrect-name.value
   # availability_set_id = azurerm_availability_set.availability-set-name.id
   # disable_password_authentication = false
+  custom_data = data.template_cloudinit_config.linuxconfig.rendered
 
   network_interface_ids = [
     azurerm_network_interface.nic-name.id
@@ -260,6 +270,7 @@ resource "azurerm_key_vault_secret" "key-secrect-name" {
    ]
 }
 
+#ssh-key
 resource "tls_private_key" "ssh-private-key-name" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -269,3 +280,4 @@ resource "local_file" "local-file-name" {
   filename = "linuxkey.pem"
   content = tls_private_key.ssh-private-key-name.private_key_pem
 }
+
