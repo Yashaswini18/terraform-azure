@@ -17,7 +17,7 @@ provider "azurerm" {
 }
 
 locals {
-  resource_group = "Terraform-RG"
+  resource_group = "Terraform-RG-2"
   location = "West Europe"
 }
 
@@ -74,14 +74,15 @@ resource "azurerm_network_interface" "nic-name" {
   ]
 }
 
-resource "azurerm_windows_virtual_machine" "vm-name" {
-  name                = "terraform-vm"
+resource "azurerm_linux_virtual_machine" "linux-vm-name" {
+  name                = "terraform-linux-vm"
   resource_group_name = azurerm_resource_group.Terraform-RG.name
   location            = local.location
   size                = "Standard_F2"
   admin_username      = "adminuser"
   admin_password      = azurerm_key_vault_secret.key-secrect-name.value
   #availability_set_id = azurerm_availability_set.availability-set-name.id
+  disable_password_authentication = false
 
   network_interface_ids = [
     azurerm_network_interface.nic-name.id
@@ -93,11 +94,11 @@ resource "azurerm_windows_virtual_machine" "vm-name" {
   }
 
   source_image_reference {
-    publisher = "MicrosoftWindowsServer"
-    offer     = "WindowsServer"
-    sku       = "2016-Datacenter"
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-focal"
+    sku       = "20_04-lts"
     version   = "latest"
-  }
+  } 
   
   depends_on = [ 
     azurerm_network_interface.nic-name, 
@@ -122,15 +123,16 @@ resource "azurerm_managed_disk" "disk_name" {
   disk_size_gb         = "1"
 }
 
-# resource "azurerm_virtual_machine_data_disk_attachment" "data-disk-attachment-name" {
-#   managed_disk_id    = azurerm_managed_disk.disk_name.id
-#   virtual_machine_id = azurerm_windows_virtual_machine.vm-name.id
-#   lun                = "0"
-#   caching            = "ReadWrite"
-#   depends_on = [ 
-#     azurerm_managed_disk.disk_name, azurerm_windows_virtual_machine.vm-name
-#    ]
-# }
+resource "azurerm_virtual_machine_data_disk_attachment" "data-disk-attachment-name" {
+  managed_disk_id    = azurerm_managed_disk.disk_name.id
+  virtual_machine_id = azurerm_linux_virtual_machine.linux-vm-name.id
+  lun                = "0"
+  caching            = "ReadWrite"
+  depends_on = [ 
+    azurerm_managed_disk.disk_name, 
+    azurerm_linux_virtual_machine.linux-vm-name
+   ]
+}
 
 # resource "azurerm_availability_set" "availability-set-name" {
 #   name                = "terraform-aset"
@@ -247,6 +249,7 @@ resource "azurerm_key_vault_secret" "key-secrect-name" {
   value        = "P@$$w0rd1234!"
   key_vault_id = azurerm_key_vault.keyvault-name.id
   depends_on = [ 
-    azurerm_key_vault.keyvault-name
+    azurerm_key_vault.keyvault-name,
+    azurerm_resource_group.Terraform-RG
    ]
 }
