@@ -79,14 +79,19 @@ resource "azurerm_linux_virtual_machine" "linux-vm-name" {
   resource_group_name = azurerm_resource_group.Terraform-RG.name
   location            = local.location
   size                = "Standard_F2"
-  admin_username      = "adminuser"
-  admin_password      = azurerm_key_vault_secret.key-secrect-name.value
-  #availability_set_id = azurerm_availability_set.availability-set-name.id
-  disable_password_authentication = false
+  admin_username      = "linuxuser"
+  # admin_password      = azurerm_key_vault_secret.key-secrect-name.value
+  # availability_set_id = azurerm_availability_set.availability-set-name.id
+  # disable_password_authentication = false
 
   network_interface_ids = [
     azurerm_network_interface.nic-name.id
   ]
+
+    admin_ssh_key {
+    username   = "linuxuser"
+    public_key = tls_private_key.ssh-private-key-name.public_key_openssh #private key will be stored in the
+  }
 
   os_disk {
     caching              = "ReadWrite"
@@ -103,7 +108,8 @@ resource "azurerm_linux_virtual_machine" "linux-vm-name" {
   depends_on = [ 
     azurerm_network_interface.nic-name, 
     #azurerm_availability_set.availability-set-name,
-    azurerm_key_vault_secret.key-secrect-name
+    azurerm_key_vault_secret.key-secrect-name,
+    tls_private_key.ssh-private-key-name
   ]
 }
 
@@ -252,4 +258,14 @@ resource "azurerm_key_vault_secret" "key-secrect-name" {
     azurerm_key_vault.keyvault-name,
     azurerm_resource_group.Terraform-RG
    ]
+}
+
+resource "tls_private_key" "ssh-private-key-name" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "local_file" "local-file-name" {
+  filename = "linuxkey.pem"
+  content = tls_private_key.ssh-private-key-name.private_key_pem
 }
